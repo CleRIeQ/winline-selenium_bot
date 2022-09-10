@@ -1,15 +1,14 @@
-import random
-import time
 from selenium import webdriver
+from selenium.webdriver.support import expected_conditions
+from selenium.webdriver.support.wait import WebDriverWait
 from selenium.common import NoSuchElementException, ElementNotVisibleException, StaleElementReferenceException, \
     TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from fake_useragent import UserAgent
+import random
+import time
 import keyboard
-from selenium.webdriver.support import expected_conditions
-from selenium.webdriver.support.wait import WebDriverWait
 import datetime
-
 
 options = webdriver.ChromeOptions()
 ua = UserAgent().chrome
@@ -64,18 +63,15 @@ def new_or_last():
 
 
 def get_info():
-    global account_login
-    global account_password
-    global game_for_bids
-    global new_or_last_var
-    global numxz
+    global account_password, account_login, game_for_bids, new_or_last_var, numxz
 
     if numxz > 0:
         return 0
 
     numxz += 1
-    account_login = input("Логин: ")
-    account_password = input("Пароль: ")
+    
+    #account_login = input("Логин: ")
+    #account_password = input("Пароль: ")
 
     while True:
         print("Введите цифру для выбора игры \n 1 - баскетбол, 2 - хоккей")
@@ -109,8 +105,6 @@ def open_site(url):
 
 
 def login_auth():
-    if numxz > 0:
-        return 0
 
     try:
         WebDriverWait(driver, 30, 1).until(lambda x: x.find_element(By.XPATH, "/html/body/div[2]/header/wlb-top-menu/div/div[2]/wlb-login-component/div/div/a[1]").is_displayed())
@@ -239,10 +233,12 @@ def check_bid_result():
                     driver.quit()
 
                 next_bid_timer()
+                already_started_match_bid(game_for_bids)
                 do_bid(game=game_for_bids)
             elif str(bid.text) == "0":
                 result = "возврат"
                 next_bid_timer()
+                already_started_match_bid(game_for_bids)
                 do_bid(game=game_for_bids)
             else:
                 print("выйгрыш")
@@ -273,16 +269,23 @@ def check_bid_result():
                     driver.quit()
                 else:
                     next_bid_timer()
+                    already_started_match_bid(game_for_bids)
                     do_bid(game=game_for_bids)
 
 
-def find_table():
-
-
-
 def already_started_match_bid(game):
+    global bid_type
+    global count
+    global checker
+    global bid_score
+    global match
+    global ignored_exceptions
+    global i
+    global second_match
 
-    WebDriverWait(driver, 30, 1).until(lambda x: x.find_element(By.XPATH, "//span[text()='Ближайшие']").is_displayed())
+    print(second_match)
+
+    WebDriverWait(driver, 30, 1).until(lambda x: x.find_element(By.XPATH, "//span[text()='Сейчас']").is_displayed())
     in_game = driver.find_element(By.XPATH, "//span[text()='Сейчас']")
     in_game.click()
 
@@ -315,11 +318,230 @@ def already_started_match_bid(game):
             driver.execute_script("window.scrollTo(0, 50)")
             driver.execute_script("window.scrollTo(0, 0)")
 
-    WebDriverWait(driver, 30, 1).until(lambda x: x.find_element(By.XPATH, "/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]").is_displayed())
-    in_game_table = driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]")
+    match_now = driver.find_element(By.XPATH, f"//span[text()='{second_match}']")
+    match_now.click()
 
-    sec_match = in_game_table.find_element(By.XPATH, f"//h2[text()='{second_match}']")
-    sec_match.click()
+    if game == "баскетбол":
+
+        try:
+            table_title = driver.find_element(By.XPATH, "//span[text()='Чет/Нечет']")
+            table_title_p = table_title.find_element(By.XPATH, "..")
+            table_title_p_p = table_title_p.find_element(By.XPATH, "..")
+        except NoSuchElementException:
+            print("нет таблицы")
+            checker += 1
+            return 0
+
+        try:
+            if bid_type == "чет":
+                try:
+                    cht = table_title_p_p.find_element(By.XPATH, "./div[5]/div[2]/div")
+                    if "locked" in cht.get_attribute("class"):
+                        print("кнопка не активна")
+                        checker += 1
+                        return 0
+                    count = table_title_p_p.find_element(By.XPATH, "./div[5]/div[2]/div/span[4]")
+                except NoSuchElementException:
+                    print("нет коэфицентов")
+                    checker += 1
+                    return 0
+                driver.execute_script("window.scrollTo(0, 0)")
+                try:
+                    if float(count.text) >= 1.87:
+                        cht.click()
+                        try:
+                            sum_input = driver.find_element(By.XPATH,
+                                                            "/html/body/div[2]/div[2]/div/div[2]/div/div/div[1]/div[1]/div/div[2]/div[2]/div/div[3]/div[1]/div[2]/input")
+                            sum_input.click()
+                            time.sleep(3)
+
+                            sum_input.clear()
+                            time.sleep(5)
+                            sum_input.send_keys(str(basketball_bids[bid_score])) # ?
+                            time.sleep(2)
+
+                            accept = driver.find_element(By.XPATH, "//button[text()='Принять']")
+                            accept.click()
+                            time.sleep(15)  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                            WebDriverWait(driver, 60, ignored_exceptions=ignored_exceptions).until(
+                                expected_conditions.presence_of_element_located((By.LINK_TEXT, '«Мои пари»')))
+
+                            time.sleep(2)
+
+                            pop_up = driver.find_element(By.LINK_TEXT, '«Мои пари»')
+                            time.sleep(10)
+                            pop_up.click()
+
+                        except NoSuchElementException:
+                            print("Не могу найти поле ввода или кнопку Принять")
+                            driver.close()
+                            driver.quit()
+                        return 0
+
+                    else:
+                        print("Не подходящий коэфицент")
+                        checker += 1
+                        get_all_games("баскетбол")
+                        return 0
+                except ValueError:
+                    print("couldn't convert string to float")
+                    return 0
+            else:
+                try:
+                    table_title = driver.find_element(By.XPATH, "//span[text()='Чет/Нечет']")
+                    table_title_p = table_title.find_element(By.XPATH, "..")
+                    table_title_p_p = table_title_p.find_element(By.XPATH, "..")
+                except NoSuchElementException:
+                    print("нет таблицы")
+                    checker += 1
+                    return 0
+                try:
+                    time.sleep(1)
+                    nch = table_title_p_p.find_element(By.XPATH, "./div[5]/div[3]/div")
+                    if "locked" in nch.get_attribute("class"):
+                        print("кнопка не активна")
+                        checker += 1
+                        return 0
+                    count = table_title_p_p.find_element(By.XPATH, "./div[5]/div[3]/div/span[4]")
+                except NoSuchElementException:
+                    print("Нет коэфицентов")
+                    checker += 1
+                    return 0
+
+                driver.execute_script("window.scrollTo(0, 0)")
+                try:
+                    if float(count.text) >= 1.87:
+                        nch.click()
+                        try:
+                            sum_input = driver.find_element(By.XPATH,
+                                                            "/html/body/div[2]/div[2]/div/div[2]/div/div/div[1]/div[1]/div/div[2]/div[2]/div/div[3]/div[1]/div[2]/input")
+                            sum_input.click()
+                            time.sleep(2)
+                            time.sleep(3)
+
+                            sum_input.clear()
+                            time.sleep(5)
+                            sum_input.send_keys(str(basketball_bids[bid_score]))
+                            time.sleep(2)
+
+                            accept = driver.find_element(By.XPATH, "//button[text()='Принять']")
+                            accept.click()
+                            time.sleep(15)  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                            WebDriverWait(driver, 60, ignored_exceptions=ignored_exceptions).until(
+                                expected_conditions.presence_of_element_located((By.LINK_TEXT, '«Мои пари»')))
+                            time.sleep(2)  # на проверку
+                            pop_up = driver.find_element(By.LINK_TEXT, '«Мои пари»')  #
+                            time.sleep(10)
+                            pop_up.click()  #
+
+                        except NoSuchElementException:
+                            print("Не могу найти поле ввода или кнопку Принять")
+                            driver.close()
+                            driver.quit()
+
+                        return 0
+                    else:
+                        print("Не подходящие коэфиценты")
+                        checker += 1
+                        return 0
+                except ValueError:
+                    print("couldn't convert string to float")
+                    return 0
+
+        except NoSuchElementException:
+            print("На следующий/е матчи нет коэфицентов!")
+            driver.close()
+            driver.quit()
+
+    # another game
+
+    if game == "хоккей":
+
+        try:
+            table_title = driver.find_element(By.XPATH, "//span[text()='Чет/Нечет']")
+            table_title_p = table_title.find_element(By.XPATH, "..")
+            table_title_p_p = table_title_p.find_element(By.XPATH, "..")
+        except NoSuchElementException:
+            print("нет таблицы")
+            checker += 1
+            return 0
+        try:
+            bid_type = "нечет"
+            try:
+                time.sleep(1)
+                try:
+                    nch = table_title_p_p.find_element(By.XPATH, "./div[3]/div[3]/div")
+                except NoSuchElementException:
+                    nch = table_title_p_p.find_element(By.XPATH, "./div[5]/div[3]/div")
+                if "locked" in nch.get_attribute("class"):
+                    print("кнопка не активна")
+                    checker += 1
+                    return 0
+                count = table_title_p_p.find_element(By.XPATH, "./div[3]/div[3]/div/span[4]")
+            except NoSuchElementException:
+                print("Не нашло коэфиценты")
+                checker += 1
+                return 0
+
+            driver.execute_script("window.scrollTo(0, 0)")
+            try:
+                print("Проверяем коэфиценты")
+                time.sleep(2)
+                print(count.text)
+                if float(count.text) >= 1.9:
+                    nch.click()
+                    try:
+                        sum_input = driver.find_element(By.XPATH,
+                                                        "/html/body/div[2]/div[2]/div/div[2]/div/div/div[1]/div[1]/div/div[2]/div[2]/div/div[3]/div[1]/div[2]/input")
+                        sum_input.click()
+                        time.sleep(3)
+
+                        sum_input.clear()
+                        time.sleep(5)
+                        sum_input.send_keys(str(hokkey_bids[bid_score]))
+                        time.sleep(2)
+
+                        accept = driver.find_element(By.XPATH, "//button[text()='Принять']")
+                        accept.click()
+                        time.sleep(15)
+
+                        WebDriverWait(driver, 60, ignored_exceptions=ignored_exceptions).until(
+                            expected_conditions.presence_of_element_located(
+                                (By.LINK_TEXT, '«Мои пари»')))
+
+                        time.sleep(2)
+                        pop_up = driver.find_element(By.LINK_TEXT, '«Мои пари»')
+                        time.sleep(10)
+                        pop_up.click()
+
+                    except NoSuchElementException:
+                        print("Не могу найти поле ввода или кнопку Принять")
+                        driver.close()
+                        driver.quit()
+
+                    return 0
+                else:
+                    print("Маленький коэфицент")
+                    checker += 1
+                    return 0
+
+            except ValueError:
+                print("couldn't convert string to float")
+                return 0
+
+        except NoSuchElementException:
+            print("Ошибка2")
+            driver.close()
+            driver.quit()
+    if i > match:
+        print("Закончились игры")
+        driver.close()
+        driver.quit()
+    else:
+        time.sleep(5)
+        check_bid_result()
 
 
 def get_all_games(game):
@@ -442,20 +664,35 @@ def do_bid(game):
             try:
                 game_match = driver.find_element(By.XPATH,
                                                  f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i}]/wlb-events-list-item/section/div/div[1]/div[2]/a")
-                second_match = driver.find_element(By.XPATH,
-                                                   f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i+1}]/wlb-events-list-item/section/div/div[1]/div[2]/a/h2").text
-
+                try:
+                    second_match = driver.find_element(By.XPATH,
+                                                       f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i + 1}]/wlb-events-list-item/section/div/div[1]/div[2]/a/h2/span[1]").text
+                except NoSuchElementException:
+                    try:
+                        second_match = driver.find_element(By.XPATH,
+                                                           f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i + 1}]/wlb-events-list-item/section/div/div[1]/div[3]/a/h2/span[1]").text
+                    except NoSuchElementException:
+                        print("N/G second_game")
             except NoSuchElementException:
                 try:
                     game_match = driver.find_element(By.XPATH,
                                                      f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i}]/wlb-events-list-item/section/div/div[1]/div[3]/a")
-                    second_match = driver.find_element(By.XPATH,
-                                                           f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i+1}]/wlb-events-list-item/section/div/div[1]/div[3]/a/h2").text
+                    try:
+                        second_match = driver.find_element(By.XPATH,
+                                                           f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i + 1}]/wlb-events-list-item/section/div/div[1]/div[2]/a/h2/span[1]").text
+                    except NoSuchElementException:
+                        try:
+                            second_match = driver.find_element(By.XPATH,
+                                                               f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i + 1}]/wlb-events-list-item/section/div/div[1]/div[3]/a/h2/span[1]").text
+                        except NoSuchElementException:
+                            print("N/G second_game")
                 except NoSuchElementException:
                     i = 0
                     print("Закончились игры. Завершаем работу...")
                     driver.close()
                     driver.quit()
+
+            print(second_match)
 
             game_match.click()
             time.sleep(3)
@@ -614,20 +851,35 @@ def do_bid(game):
             try:
                 game_match = driver.find_element(By.XPATH,
                                                  f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i}]/wlb-events-list-item/section/div/div[1]/div[2]/a")
-                second_match = driver.find_element(By.XPATH,
-                                                   f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i+1}]/wlb-events-list-item/section/div/div[1]/div[2]/a/h2").text
-
+                try:
+                    second_match = driver.find_element(By.XPATH,
+                                                       f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i+1}]/wlb-events-list-item/section/div/div[1]/div[2]/a/h2/span[1]").text
+                except NoSuchElementException:
+                    try:
+                        second_match = driver.find_element(By.XPATH,
+                                                           f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i+1}]/wlb-events-list-item/section/div/div[1]/div[3]/a/h2/span[1]").text
+                    except NoSuchElementException:
+                        print("N/G second_game")
             except NoSuchElementException:
                 try:
                     game_match = driver.find_element(By.XPATH,
                                                      f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i}]/wlb-events-list-item/section/div/div[1]/div[3]/a")
-                    second_match = driver.find_element(By.XPATH,
-                                                       f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i+1}]/wlb-events-list-item/section/div/div[1]/div[3]/a/h2").text
+                    try:
+                        second_match = driver.find_element(By.XPATH,
+                                                        f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i+1}]/wlb-events-list-item/section/div/div[1]/div[2]/a/h2/span[1]").text
+                    except NoSuchElementException:
+                        try:
+                            second_match = driver.find_element(By.XPATH,
+                                                               f"/html/body/div[2]/div[2]/div/div[1]/div[1]/wlb-events-list/div/div[3]/div/div[{i + 1}]/wlb-events-list-item/section/div/div[1]/div[3]/a/h2/span[1]").text
+                        except NoSuchElementException:
+                            print("N/G second_game")
                 except NoSuchElementException:
                     i = 0
                     print("Закончились игры. Завершаем работу...")
                     driver.close()
                     driver.quit()
+
+            print(second_match)
 
             game_match.click()
             time.sleep(3)
@@ -728,20 +980,18 @@ def parent_func():
     login_auth()
     time.sleep(2)
     get_last_bid_type()
-    do_bid(str(game_for_bids))
+    already_started_match_bid(str(game_for_bids))
+    #do_bid(str(game_for_bids))
 
 
 if __name__ == '__main__':
 
-    if datetime.date.today().day in range(3, 20):
-        while True:
-            try:
-                parent_func()
-            except (TimeoutException, WebDriverException):
-                time.sleep(1)
-                print("Потеря соединения")
-                continue
+    while True:
+        try:
+            parent_func()
+        except (TimeoutException, WebDriverException):
+            time.sleep(1)
+            print("Потеря соединения")
+            continue
 
-    else:
-        print("просрочен ключ")
 
