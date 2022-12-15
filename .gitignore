@@ -1,0 +1,11 @@
+.git/
+.idea/
+Bot/
+build/
+dist/
+env/
+showyourwork/
+chromedriver.exe
+icon.ico
+main.spec
+mainpy.spec
